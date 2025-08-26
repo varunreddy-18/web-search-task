@@ -62,6 +62,41 @@ from collections import defaultdict
 from urllib.parse import urljoin, urlparse
 
 class WebCrawlerTests(unittest.TestCase):
+    def test_index_updated_after_crawl(self):
+        crawler = WebCrawler()
+        crawler.index["https://test.com"] = "Test page content"
+        self.assertIn("https://test.com", crawler.index)
+        self.assertEqual(crawler.index["https://test.com"], "Test page content")
+
+    @patch('sys.stdout')
+    def test_print_results_output(self, mock_stdout):
+        crawler = WebCrawler()
+        results = ["https://result.com/page1", "https://result.com/page2"]
+        crawler.print_results(results)
+        output = "".join(call.args[0] for call in mock_stdout.write.call_args_list)
+        self.assertIn("Search results:", output)
+        self.assertIn("- https://result.com/page1", output)
+        self.assertIn("- https://result.com/page2", output)
+        mock_stdout.write.reset_mock()
+        crawler.print_results([])
+        output = "".join(call.args[0] for call in mock_stdout.write.call_args_list)
+        self.assertIn("No results found.", output)
+
+    def test_crawl_does_not_revisit(self):
+        crawler = WebCrawler()
+        crawler.visited = {"https://already.com"}
+        crawler.crawl("https://already.com")
+        # Should not raise or add duplicate
+        self.assertEqual(len(crawler.visited), 1)
+
+    def test_search_special_characters(self):
+        crawler = WebCrawler()
+        crawler.index["page1"] = "C++ is a language."
+        crawler.index["page2"] = "Python & Java are popular."
+        results = crawler.search("C++")
+        self.assertEqual(results, ["page1"])
+        results = crawler.search("&")
+        self.assertEqual(results, ["page2"])
     @patch('requests.get')
     def test_crawl_success(self, mock_get):
         sample_html = """
